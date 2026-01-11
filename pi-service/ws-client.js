@@ -1,10 +1,10 @@
 const { io } = require("socket.io-client");
-const pty = require("node-pty");
+const WebSocket = require("ws");
 const si = require("systeminformation");
 const os = require("os");
 
 let socket = null;
-let terminal = null;
+let ttydWs = null;
 
 global.serverConnected = false;
 
@@ -48,6 +48,34 @@ function getLocalIP() {
   return "unknown";
 }
 
+function connectToTtyd() {
+  if (ttydWs && ttydWs.readyState === WebSocket.OPEN) return;
+
+  console.log("Connecting to ttyd...");
+  ttydWs = new WebSocket("ws://localhost:7681/ws");
+
+  ttydWs.on("open", () => {
+    console.log("Connected to ttyd");
+  });
+
+  ttydWs.on("message", (data) => {
+    // Forward ttyd output to server
+    if (socket && socket.connected) {
+      socket.emit("terminal:output", data.toString("base64"));
+    }
+  });
+
+  ttydWs.on("close", () => {
+    console.log("ttyd connection closed, reconnecting...");
+    ttydWs = null;
+    setTimeout(connectToTtyd, 1000);
+  });
+
+  ttydWs.on("error", (err) => {
+    console.log("ttyd error:", err.message);
+  });
+}
+
 function connectToServer(serverUrl, piToken) {
   if (socket?.connected) return;
 
@@ -61,23 +89,8 @@ function connectToServer(serverUrl, piToken) {
     console.log("Connected to server");
     global.serverConnected = true;
 
-    // Start terminal
-    if (!terminal) {
-      console.log("Starting terminal...");
-      terminal = pty.spawn("bash", [], {
-        name: "xterm-256color",
-        cols: 80,
-        rows: 24,
-        cwd: process.env.HOME || "/home/pi",
-        env: process.env,
-      });
-
-      terminal.onData((data) => {
-        console.log("Sending terminal output:", data.length, "bytes");
-        socket.emit("terminal:output", data);
-      });
-      console.log("Terminal started");
-    }
+    // Connect to local ttyd
+    connectToTtyd();
 
     // Send stats periodically
     const statsInterval = setInterval(() => {
@@ -92,15 +105,22 @@ function connectToServer(serverUrl, piToken) {
   });
 
   socket.on("terminal:input", (data) => {
-    console.log("Received terminal input:", data.length, "bytes");
-    if (terminal) {
-      terminal.write(data);
+    // Forward input to ttyd
+    if (ttydWs && ttydWs.readyState === WebSocket.OPEN) {
+      // ttyd expects: 0 + data for input
+      const buf = Buffer.from(data, "base64");
+      ttydWs.send(buf);
     }
   });
 
   socket.on("terminal:resize", ({ cols, rows }) => {
-    if (terminal) {
-      terminal.resize(cols, rows);
+    if (ttydWs && ttydWs.readyState === WebSocket.OPEN) {
+      // ttyd resize: 1 + JSON
+      const msg = Buffer.concat([
+        Buffer.from([1]),
+        Buffer.from(JSON.stringify({ columns: cols, rows: rows }))
+      ]);
+      ttydWs.send(msg);
     }
   });
 
