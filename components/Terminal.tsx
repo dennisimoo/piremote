@@ -18,6 +18,26 @@ export function Terminal({ socket }: TerminalProps) {
     socketRef.current = socket;
   }, [socket]);
 
+  const setupSocketListeners = (socket: Socket) => {
+    const handleOutput = (data: string) => {
+      console.log("Received output:", data.length, "bytes");
+      if (xtermRef.current) {
+        xtermRef.current.write(data);
+      }
+    };
+
+    socket.off("terminal:output");
+    socket.on("terminal:output", handleOutput);
+
+    // Send initial resize
+    if (xtermRef.current) {
+      socket.emit("terminal:resize", {
+        cols: xtermRef.current.cols,
+        rows: xtermRef.current.rows,
+      });
+    }
+  };
+
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
 
@@ -47,12 +67,20 @@ export function Terminal({ socket }: TerminalProps) {
       xtermRef.current = xterm;
       fitAddonRef.current = fitAddon;
 
+      console.log("Terminal initialized, cols:", xterm.cols, "rows:", xterm.rows);
+
       // Send input directly
       xterm.onData((data: string) => {
+        console.log("Sending input:", data.length, "bytes");
         if (socketRef.current) {
           socketRef.current.emit("terminal:input", data);
         }
       });
+
+      // Set up output handler if socket already exists
+      if (socketRef.current) {
+        setupSocketListeners(socketRef.current);
+      }
     };
 
     initTerminal();
@@ -83,28 +111,17 @@ export function Terminal({ socket }: TerminalProps) {
   useEffect(() => {
     if (!socket || !xtermRef.current) return;
 
-    const handleOutput = (data: string) => {
-      xtermRef.current?.write(data);
-    };
-
-    socket.on("terminal:output", handleOutput);
-
-    // Send initial resize
-    if (xtermRef.current) {
-      socket.emit("terminal:resize", {
-        cols: xtermRef.current.cols,
-        rows: xtermRef.current.rows,
-      });
-    }
+    console.log("Socket connected, setting up listeners");
+    setupSocketListeners(socket);
 
     return () => {
-      socket.off("terminal:output", handleOutput);
+      socket.off("terminal:output");
     };
   }, [socket]);
 
   return (
-    <div className="h-full w-full" style={{ minHeight: "300px" }}>
-      <div ref={terminalRef} className="h-full w-full" style={{ height: "100%" }} />
+    <div className="w-full" style={{ height: "calc(100vh - 120px)", minHeight: "400px" }}>
+      <div ref={terminalRef} className="w-full h-full" />
     </div>
   );
 }
