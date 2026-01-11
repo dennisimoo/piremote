@@ -64,12 +64,23 @@ function connectToServer(serverUrl, piToken) {
     // Start terminal
     if (!terminal) {
       console.log("Starting terminal...");
-      terminal = pty.spawn("bash", [], {
+
+      // Set up proper environment
+      const env = {
+        ...process.env,
+        HOME: "/home/pi",
+        USER: "pi",
+        SHELL: "/bin/bash",
+        PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        TERM: "xterm-256color",
+      };
+
+      terminal = pty.spawn("bash", ["--login"], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
-        cwd: process.env.HOME || "/home/pi",
-        env: process.env,
+        cwd: "/home/pi",
+        env: env,
       });
 
       terminal.onData((data) => {
