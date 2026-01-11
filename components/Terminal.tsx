@@ -22,9 +22,6 @@ export function Terminal({ socket }: TerminalProps) {
       const { Terminal: XTerm } = await import("xterm");
       const { FitAddon } = await import("xterm-addon-fit");
 
-      // Import CSS
-      await import("xterm/css/xterm.css");
-
       xterm = new XTerm({
         theme: {
           background: "#000000",
