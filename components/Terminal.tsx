@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Terminal as XTerm } from "xterm";
-import { FitAddon } from "xterm-addon-fit";
-import { Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
 interface TerminalProps {
   socket: Socket | null;
@@ -11,56 +9,73 @@ interface TerminalProps {
 
 export function Terminal({ socket }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const xtermRef = useRef<any>(null);
+  const fitAddonRef = useRef<any>(null);
 
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
 
-    const xterm = new XTerm({
-      theme: {
-        background: "#000000",
-        foreground: "#ffffff",
-        cursor: "#ffffff",
-        cursorAccent: "#000000",
-        selectionBackground: "#ffffff",
-        selectionForeground: "#000000",
-      },
-      fontFamily: "ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace",
-      fontSize: 14,
-      cursorBlink: true,
-    });
+    let xterm: any;
+    let fitAddon: any;
 
-    const fitAddon = new FitAddon();
-    xterm.loadAddon(fitAddon);
-    xterm.open(terminalRef.current);
-    fitAddon.fit();
+    const initTerminal = async () => {
+      const { Terminal: XTerm } = await import("xterm");
+      const { FitAddon } = await import("xterm-addon-fit");
 
-    xtermRef.current = xterm;
-    fitAddonRef.current = fitAddon;
+      // Import CSS
+      await import("xterm/css/xterm.css");
+
+      xterm = new XTerm({
+        theme: {
+          background: "#000000",
+          foreground: "#ffffff",
+          cursor: "#ffffff",
+          cursorAccent: "#000000",
+          selectionBackground: "#ffffff",
+          selectionForeground: "#000000",
+        },
+        fontFamily: "ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace",
+        fontSize: 14,
+        cursorBlink: true,
+      });
+
+      fitAddon = new FitAddon();
+      xterm.loadAddon(fitAddon);
+      xterm.open(terminalRef.current!);
+      fitAddon.fit();
+
+      xtermRef.current = xterm;
+      fitAddonRef.current = fitAddon;
+
+      xterm.onData((data: string) => {
+        if (socket) {
+          socket.emit("terminal:input", data);
+        }
+      });
+    };
+
+    initTerminal();
 
     const handleResize = () => {
-      fitAddon.fit();
-      if (socket) {
-        socket.emit("terminal:resize", {
-          cols: xterm.cols,
-          rows: xterm.rows,
-        });
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+        if (socket && xtermRef.current) {
+          socket.emit("terminal:resize", {
+            cols: xtermRef.current.cols,
+            rows: xtermRef.current.rows,
+          });
+        }
       }
     };
 
     window.addEventListener("resize", handleResize);
 
-    xterm.onData((data) => {
-      if (socket) {
-        socket.emit("terminal:input", data);
-      }
-    });
-
     return () => {
       window.removeEventListener("resize", handleResize);
-      xterm.dispose();
-      xtermRef.current = null;
+      if (xtermRef.current) {
+        xtermRef.current.dispose();
+        xtermRef.current = null;
+      }
     };
   }, []);
 
@@ -73,10 +88,12 @@ export function Terminal({ socket }: TerminalProps) {
 
     socket.on("terminal:output", handleOutput);
 
-    socket.emit("terminal:resize", {
-      cols: xtermRef.current.cols,
-      rows: xtermRef.current.rows,
-    });
+    if (xtermRef.current) {
+      socket.emit("terminal:resize", {
+        cols: xtermRef.current.cols,
+        rows: xtermRef.current.rows,
+      });
+    }
 
     return () => {
       socket.off("terminal:output", handleOutput);
