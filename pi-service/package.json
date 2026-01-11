@@ -1,0 +1,14 @@
+{
+  "name": "piremote-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@abandonware/bleno": "^0.5.1-5",
+    "socket.io-client": "^4.7.0",
+    "node-pty": "^1.0.0",
+    "systeminformation": "^5.22.0"
+  }
+}
