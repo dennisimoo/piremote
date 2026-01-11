@@ -5,6 +5,7 @@ const os = require("os");
 
 let socket = null;
 let terminal = null;
+let initialPromptSent = false;
 
 global.serverConnected = false;
 
@@ -89,11 +90,6 @@ function connectToServer(serverUrl, piToken) {
         }
       });
 
-      // Send a newline to trigger the initial prompt
-      setTimeout(() => {
-        terminal.write("\n");
-      }, 100);
-
       console.log("Terminal started");
     }
 
@@ -118,12 +114,21 @@ function connectToServer(serverUrl, piToken) {
   socket.on("terminal:resize", ({ cols, rows }) => {
     if (terminal) {
       terminal.resize(cols, rows);
+
+      // Send initial prompt on first resize (when client connects)
+      if (!initialPromptSent) {
+        initialPromptSent = true;
+        setTimeout(() => {
+          terminal.write("\n");
+        }, 200);
+      }
     }
   });
 
   socket.on("disconnect", () => {
     console.log("Disconnected from server");
     global.serverConnected = false;
+    initialPromptSent = false; // Reset for next connection
   });
 
   socket.on("connect_error", (err) => {
