@@ -101,8 +101,8 @@ export function Terminal({ socket }: TerminalProps) {
   }, [socket]);
 
   return (
-    <div className="h-full w-full">
-      <div ref={terminalRef} className="h-full w-full" />
+    <div className="h-full w-full" style={{ minHeight: "300px" }}>
+      <div ref={terminalRef} className="h-full w-full" style={{ height: "100%" }} />
     </div>
   );
 }

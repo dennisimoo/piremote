@@ -110,7 +110,7 @@ export default function DashboardPage() {
             <p className="text-gray-500">Connecting to Pi...</p>
           </div>
         ) : view === "terminal" ? (
-          <div className="h-full p-4">
+          <div className="h-full p-4" style={{ minHeight: "400px" }}>
             <Terminal socket={socket} />
           </div>
         ) : (
