@@ -16,7 +16,7 @@ export default function RootLayout({
       <head>
         <link
           rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/xterm@5.5.0/css/xterm.min.css"
+          href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css"
         />
       </head>
       <body className="min-h-screen bg-black text-white antialiased">
