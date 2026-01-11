@@ -1,7 +1,7 @@
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
 import { validateToken } from "./lib/auth";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -11,13 +11,8 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-declare global {
-  var piConnected: boolean;
-  var piSocket: any;
-}
-
-global.piConnected = false;
-global.piSocket = null;
+let piSocket: Socket | null = null;
+const clientSockets: Set<Socket> = new Set();
 
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
@@ -39,70 +34,88 @@ app.prepare().then(() => {
     const piToken = socket.handshake.auth.piToken;
     const expectedToken = process.env.PI_TOKEN || "pi-secret-token";
 
+    console.log("Pi attempting connection, token match:", piToken === expectedToken);
+
     if (piToken !== expectedToken) {
+      console.log("Pi rejected - invalid token");
       socket.disconnect();
       return;
     }
 
-    console.log("Pi connected");
-    global.piConnected = true;
-    global.piSocket = socket;
+    console.log("Pi connected successfully");
+    piSocket = socket;
 
-    // Broadcast to all clients that Pi is online
-    io.emit("pi:online");
-
-    socket.on("terminal:output", (data: string) => {
-      io.emit("terminal:output", data);
+    // Notify all clients that Pi is online
+    clientSockets.forEach(client => {
+      client.emit("pi:online");
     });
 
+    // Forward terminal output to all clients
+    socket.on("terminal:output", (data: string) => {
+      console.log("Forwarding terminal output to", clientSockets.size, "clients");
+      clientSockets.forEach(client => {
+        client.emit("terminal:output", data);
+      });
+    });
+
+    // Forward stats to all clients
     socket.on("stats", (data: any) => {
-      io.emit("stats", data);
+      clientSockets.forEach(client => {
+        client.emit("stats", data);
+      });
     });
 
     socket.on("disconnect", () => {
       console.log("Pi disconnected");
-      global.piConnected = false;
-      global.piSocket = null;
-      io.emit("pi:offline");
+      piSocket = null;
+      clientSockets.forEach(client => {
+        client.emit("pi:offline");
+      });
     });
   });
 
-  // Client namespace - for web browser connections
+  // Default namespace - for web browser connections
   io.on("connection", (socket) => {
     const token = socket.handshake.auth.token;
 
     if (!validateToken(token)) {
+      console.log("Client rejected - invalid token");
       socket.disconnect();
       return;
     }
 
     console.log("Client connected");
+    clientSockets.add(socket);
 
-    // Check if Pi is online
-    if (!global.piConnected) {
+    // Tell client if Pi is online/offline
+    if (piSocket) {
+      socket.emit("pi:online");
+    } else {
       socket.emit("pi:offline");
     }
 
     // Forward terminal input to Pi
     socket.on("terminal:input", (data: string) => {
-      if (global.piSocket) {
-        global.piSocket.emit("terminal:input", data);
+      console.log("Forwarding terminal input to Pi");
+      if (piSocket) {
+        piSocket.emit("terminal:input", data);
       }
     });
 
     // Forward resize to Pi
     socket.on("terminal:resize", (size: { cols: number; rows: number }) => {
-      if (global.piSocket) {
-        global.piSocket.emit("terminal:resize", size);
+      if (piSocket) {
+        piSocket.emit("terminal:resize", size);
       }
     });
 
     socket.on("disconnect", () => {
       console.log("Client disconnected");
+      clientSockets.delete(socket);
     });
   });
 
   httpServer.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> BlackBox server ready on http://${hostname}:${port}`);
   });
 });

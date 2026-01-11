@@ -73,6 +73,7 @@ function connectToServer(serverUrl, piToken) {
       });
 
       terminal.onData((data) => {
+        console.log("Sending terminal output:", data.length, "bytes");
         socket.emit("terminal:output", data);
       });
       console.log("Terminal started");
