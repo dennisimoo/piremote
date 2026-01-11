@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { io } from "socket.io-client";
 import { BluetoothConnect } from "@/components/BluetoothConnect";
 import { WifiSetup } from "@/components/WifiSetup";
 
@@ -9,25 +10,47 @@ export default function SetupPage() {
   const [device, setDevice] = useState<BluetoothDevice | null>(null);
   const [characteristics, setCharacteristics] = useState<any>(null);
   const [error, setError] = useState("");
-  const [piOnline, setPiOnline] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    checkPiStatus();
-  }, []);
+    const token = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("token="))
+      ?.split("=")[1];
 
-  const checkPiStatus = async () => {
-    try {
-      const res = await fetch("/api/pi/status");
-      const data = await res.json();
-      setPiOnline(data.online);
-      if (data.online) {
-        router.push("/dashboard");
-      }
-    } catch {
-      setPiOnline(false);
+    if (!token) {
+      router.push("/");
+      return;
     }
-  };
+
+    // Connect to socket to check if Pi is online
+    const socket = io({
+      auth: { token },
+    });
+
+    socket.on("connect", () => {
+      // Wait a moment to receive pi:online or pi:offline
+      setTimeout(() => {
+        setChecking(false);
+      }, 2000);
+    });
+
+    socket.on("pi:online", () => {
+      // Pi is online, go to dashboard
+      socket.disconnect();
+      router.push("/dashboard");
+    });
+
+    socket.on("pi:offline", () => {
+      setChecking(false);
+    });
+
+    // Cleanup
+    return () => {
+      socket.disconnect();
+    };
+  }, [router]);
 
   const handleConnected = (dev: BluetoothDevice, chars: any) => {
     setDevice(dev);
@@ -41,7 +64,7 @@ export default function SetupPage() {
     }, 3000);
   };
 
-  if (piOnline === null) {
+  if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Checking Pi status...</p>
