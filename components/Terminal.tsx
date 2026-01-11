@@ -47,17 +47,10 @@ export function Terminal({ socket }: TerminalProps) {
       xtermRef.current = xterm;
       fitAddonRef.current = fitAddon;
 
-      // Send input as base64
+      // Send input directly
       xterm.onData((data: string) => {
         if (socketRef.current) {
-          // Prepend 0 for input (ttyd protocol) and base64 encode
-          const buf = new Uint8Array(data.length + 1);
-          buf[0] = 0; // input type
-          for (let i = 0; i < data.length; i++) {
-            buf[i + 1] = data.charCodeAt(i);
-          }
-          const base64 = btoa(String.fromCharCode(...buf));
-          socketRef.current.emit("terminal:input", base64);
+          socketRef.current.emit("terminal:input", data);
         }
       });
     };
@@ -91,22 +84,7 @@ export function Terminal({ socket }: TerminalProps) {
     if (!socket || !xtermRef.current) return;
 
     const handleOutput = (data: string) => {
-      try {
-        // Decode base64 data from ttyd
-        const decoded = atob(data);
-        // First byte is message type, rest is data
-        if (decoded.length > 0) {
-          const msgType = decoded.charCodeAt(0);
-          const content = decoded.slice(1);
-          if (msgType === 0) {
-            // Output data
-            xtermRef.current?.write(content);
-          }
-        }
-      } catch (e) {
-        // If not base64, write directly
-        xtermRef.current?.write(data);
-      }
+      xtermRef.current?.write(data);
     };
 
     socket.on("terminal:output", handleOutput);
