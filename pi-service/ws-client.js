@@ -88,6 +88,12 @@ function connectToServer(serverUrl, piToken) {
           socket.emit("terminal:output", data);
         }
       });
+
+      // Send a newline to trigger the initial prompt
+      setTimeout(() => {
+        terminal.write("\n");
+      }, 100);
+
       console.log("Terminal started");
     }
 
