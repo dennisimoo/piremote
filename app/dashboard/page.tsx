@@ -72,7 +72,7 @@ export default function DashboardPage() {
     <div className="h-screen flex flex-col">
       <header className="border-b border-white/20 p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="font-bold">PiRemote</h1>
+          <h1 className="font-bold">BlackBox</h1>
           <span
             className={`text-xs px-2 py-1 border ${
               connected

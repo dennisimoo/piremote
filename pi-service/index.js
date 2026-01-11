@@ -2,7 +2,7 @@ const { startBLE } = require("./ble-wifi");
 const { connectToServer } = require("./ws-client");
 const { exec } = require("child_process");
 
-const SERVER_URL = process.env.PIREMOTE_SERVER || "http://localhost:3000";
+const SERVER_URL = process.env.BLACKBOX_SERVER || process.env.PIREMOTE_SERVER || "http://localhost:3000";
 const PI_TOKEN = process.env.PI_TOKEN || "pi-secret-token";
 
 // Check if we have WiFi connection
@@ -19,7 +19,7 @@ function checkWifi() {
 }
 
 async function main() {
-  console.log("PiRemote Service starting...");
+  console.log("BlackBox Service starting...");
 
   // Always start BLE for WiFi configuration
   startBLE();

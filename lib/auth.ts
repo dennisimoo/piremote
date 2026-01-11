@@ -1,4 +1,4 @@
-const PASSWORD = process.env.PIREMOTE_PASSWORD || "piremote";
+const PASSWORD = process.env.BLACKBOX_PASSWORD || process.env.PIREMOTE_PASSWORD || "blackbox";
 
 export function validatePassword(password: string): boolean {
   return password === PASSWORD;
