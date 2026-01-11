@@ -75,7 +75,7 @@ function connectToServer(serverUrl, piToken) {
         TERM: "xterm-256color",
       };
 
-      terminal = pty.spawn("bash", ["--login"], {
+      terminal = pty.spawn("bash", [], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
