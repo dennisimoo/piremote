@@ -63,17 +63,19 @@ function connectToServer(serverUrl, piToken) {
 
     // Start terminal
     if (!terminal) {
+      console.log("Starting terminal...");
       terminal = pty.spawn("bash", [], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
-        cwd: process.env.HOME,
+        cwd: process.env.HOME || "/home/pi",
         env: process.env,
       });
 
       terminal.onData((data) => {
         socket.emit("terminal:output", data);
       });
+      console.log("Terminal started");
     }
 
     // Send stats periodically
@@ -89,6 +91,7 @@ function connectToServer(serverUrl, piToken) {
   });
 
   socket.on("terminal:input", (data) => {
+    console.log("Received terminal input:", data.length, "bytes");
     if (terminal) {
       terminal.write(data);
     }

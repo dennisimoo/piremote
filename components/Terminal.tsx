@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import type { Socket } from "socket.io-client";
 
 interface TerminalProps {
@@ -11,18 +11,21 @@ export function Terminal({ socket }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<any>(null);
   const fitAddonRef = useRef<any>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Keep socket ref updated
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
 
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
-
-    let xterm: any;
-    let fitAddon: any;
 
     const initTerminal = async () => {
       const { Terminal: XTerm } = await import("xterm");
       const { FitAddon } = await import("xterm-addon-fit");
 
-      xterm = new XTerm({
+      const xterm = new XTerm({
         theme: {
           background: "#000000",
           foreground: "#ffffff",
@@ -36,7 +39,7 @@ export function Terminal({ socket }: TerminalProps) {
         cursorBlink: true,
       });
 
-      fitAddon = new FitAddon();
+      const fitAddon = new FitAddon();
       xterm.loadAddon(fitAddon);
       xterm.open(terminalRef.current!);
       fitAddon.fit();
@@ -44,9 +47,10 @@ export function Terminal({ socket }: TerminalProps) {
       xtermRef.current = xterm;
       fitAddonRef.current = fitAddon;
 
+      // Use ref to always get current socket
       xterm.onData((data: string) => {
-        if (socket) {
-          socket.emit("terminal:input", data);
+        if (socketRef.current) {
+          socketRef.current.emit("terminal:input", data);
         }
       });
     };
@@ -56,8 +60,8 @@ export function Terminal({ socket }: TerminalProps) {
     const handleResize = () => {
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();
-        if (socket && xtermRef.current) {
-          socket.emit("terminal:resize", {
+        if (socketRef.current && xtermRef.current) {
+          socketRef.current.emit("terminal:resize", {
             cols: xtermRef.current.cols,
             rows: xtermRef.current.rows,
           });
@@ -85,12 +89,11 @@ export function Terminal({ socket }: TerminalProps) {
 
     socket.on("terminal:output", handleOutput);
 
-    if (xtermRef.current) {
-      socket.emit("terminal:resize", {
-        cols: xtermRef.current.cols,
-        rows: xtermRef.current.rows,
-      });
-    }
+    // Send initial resize
+    socket.emit("terminal:resize", {
+      cols: xtermRef.current.cols,
+      rows: xtermRef.current.rows,
+    });
 
     return () => {
       socket.off("terminal:output", handleOutput);
