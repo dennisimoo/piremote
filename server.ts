@@ -65,6 +65,20 @@ app.prepare().then(() => {
       });
     });
 
+    // Forward hacking output to all clients
+    socket.on("hacking:output", (data: { type: string; content: string }) => {
+      clientSockets.forEach(client => {
+        client.emit("hacking:output", data);
+      });
+    });
+
+    // Forward hacking status to all clients
+    socket.on("hacking:status", (status: string) => {
+      clientSockets.forEach(client => {
+        client.emit("hacking:status", status);
+      });
+    });
+
     socket.on("disconnect", () => {
       console.log("Pi disconnected");
       piSocket = null;
@@ -114,6 +128,22 @@ app.prepare().then(() => {
     socket.on("terminal:resize", (size: { cols: number; rows: number }) => {
       if (piSocket) {
         piSocket.emit("terminal:resize", size);
+      }
+    });
+
+    // Start hacking scan
+    socket.on("hacking:start", () => {
+      console.log("Client requested hacking scan");
+      if (piSocket) {
+        piSocket.emit("hacking:start");
+      }
+    });
+
+    // Stop hacking scan
+    socket.on("hacking:stop", () => {
+      console.log("Client requested to stop hacking scan");
+      if (piSocket) {
+        piSocket.emit("hacking:stop");
       }
     });
 

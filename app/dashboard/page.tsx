@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import { Terminal } from "@/components/Terminal";
 import { Stats } from "@/components/Stats";
+import { HackingPanel } from "@/components/HackingPanel";
 import { Button } from "@/components/ui/button";
 
 interface StatsData {
@@ -20,7 +21,7 @@ export default function DashboardPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [stats, setStats] = useState<StatsData | null>(null);
-  const [view, setView] = useState<"terminal" | "stats">("terminal");
+  const [view, setView] = useState<"hacking" | "terminal" | "stats">("hacking");
   const router = useRouter();
 
   useEffect(() => {
@@ -85,6 +86,13 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            variant={view === "hacking" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("hacking")}
+          >
+            Hacking
+          </Button>
+          <Button
             variant={view === "terminal" ? "default" : "ghost"}
             size="sm"
             onClick={() => setView("terminal")}
@@ -108,6 +116,10 @@ export default function DashboardPage() {
         {!connected ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-gray-500">Connecting to Pi...</p>
+          </div>
+        ) : view === "hacking" ? (
+          <div className="h-full p-4">
+            <HackingPanel socket={socket} />
           </div>
         ) : view === "terminal" ? (
           <div className="h-full p-4" style={{ minHeight: "400px" }}>
