@@ -94,6 +94,14 @@ app.prepare().then(() => {
       socket.emit("pi:offline");
     }
 
+    // Start new terminal when client requests it
+    socket.on("terminal:start", () => {
+      console.log("Client requested new terminal");
+      if (piSocket) {
+        piSocket.emit("terminal:start");
+      }
+    });
+
     // Forward terminal input to Pi
     socket.on("terminal:input", (data: string) => {
       console.log("Forwarding terminal input to Pi");

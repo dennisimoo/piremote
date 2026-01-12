@@ -5,7 +5,6 @@ const os = require("os");
 
 let socket = null;
 let terminal = null;
-let initialPromptSent = false;
 
 global.serverConnected = false;
 
@@ -49,6 +48,39 @@ function getLocalIP() {
   return "unknown";
 }
 
+function spawnTerminal() {
+  // Kill old terminal if exists
+  if (terminal) {
+    console.log("Killing old terminal...");
+    terminal.kill();
+    terminal = null;
+  }
+
+  console.log("Starting new terminal...");
+
+  const env = {
+    ...process.env,
+    HOME: "/home/pi",
+    PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + (process.env.PATH || ""),
+  };
+
+  terminal = pty.spawn("bash", ["--login", "-i"], {
+    name: "xterm-256color",
+    cols: 80,
+    rows: 24,
+    cwd: "/home/pi",
+    env: env,
+  });
+
+  terminal.onData((data) => {
+    if (socket && socket.connected) {
+      socket.emit("terminal:output", data);
+    }
+  });
+
+  console.log("Terminal started");
+}
+
 function connectToServer(serverUrl, piToken) {
   if (socket?.connected) return;
 
@@ -61,34 +93,6 @@ function connectToServer(serverUrl, piToken) {
   socket.on("connect", () => {
     console.log("Connected to server");
     global.serverConnected = true;
-
-    // Start terminal
-    if (!terminal) {
-      console.log("Starting terminal...");
-
-      // Set up proper environment - inherit from parent but ensure HOME is set
-      const env = {
-        ...process.env,
-        HOME: "/home/pi",
-        PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + (process.env.PATH || ""),
-      };
-
-      terminal = pty.spawn("bash", ["--login", "-i"], {
-        name: "xterm-256color",
-        cols: 80,
-        rows: 24,
-        cwd: "/home/pi",
-        env: env,
-      });
-
-      terminal.onData((data) => {
-        if (socket && socket.connected) {
-          socket.emit("terminal:output", data);
-        }
-      });
-
-      console.log("Terminal started");
-    }
 
     // Send stats periodically
     const statsInterval = setInterval(() => {
@@ -108,24 +112,20 @@ function connectToServer(serverUrl, piToken) {
     }
   });
 
+  // Spawn new terminal when client connects (signaled by terminal:start)
+  socket.on("terminal:start", () => {
+    spawnTerminal();
+  });
+
   socket.on("terminal:resize", ({ cols, rows }) => {
     if (terminal) {
       terminal.resize(cols, rows);
-
-      // Send initial prompt on first resize (when client connects)
-      if (!initialPromptSent) {
-        initialPromptSent = true;
-        setTimeout(() => {
-          terminal.write("\n");
-        }, 200);
-      }
     }
   });
 
   socket.on("disconnect", () => {
     console.log("Disconnected from server");
     global.serverConnected = false;
-    initialPromptSent = false; // Reset for next connection
   });
 
   socket.on("connect_error", (err) => {

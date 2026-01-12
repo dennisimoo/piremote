@@ -29,13 +29,18 @@ export function Terminal({ socket }: TerminalProps) {
     socket.off("terminal:output");
     socket.on("terminal:output", handleOutput);
 
-    // Send initial resize
-    if (xtermRef.current) {
-      socket.emit("terminal:resize", {
-        cols: xtermRef.current.cols,
-        rows: xtermRef.current.rows,
-      });
-    }
+    // Request a new terminal session
+    socket.emit("terminal:start");
+
+    // Send initial resize after a short delay to let terminal spawn
+    setTimeout(() => {
+      if (xtermRef.current) {
+        socket.emit("terminal:resize", {
+          cols: xtermRef.current.cols,
+          rows: xtermRef.current.rows,
+        });
+      }
+    }, 300);
   };
 
   useEffect(() => {
