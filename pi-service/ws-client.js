@@ -136,14 +136,9 @@ async function startHackingScan() {
 
       switch (message.type) {
         case 'assistant':
-          // Handle assistant messages
-          if (typeof message.content === 'string') {
-            socket?.emit("hacking:output", {
-              type: "output",
-              content: message.content,
-            });
-          } else if (Array.isArray(message.content)) {
-            for (const block of message.content) {
+          // Handle assistant messages - content is in message.message.content
+          if (message.message?.content && Array.isArray(message.message.content)) {
+            for (const block of message.message.content) {
               if (block.type === 'text') {
                 socket?.emit("hacking:output", {
                   type: "output",
@@ -152,7 +147,7 @@ async function startHackingScan() {
               } else if (block.type === 'tool_use') {
                 socket?.emit("hacking:output", {
                   type: "tool",
-                  content: `Using tool: ${block.name}\nInput: ${JSON.stringify(block.input, null, 2)}`,
+                  content: `Planning to use tool: ${block.name}`,
                 });
               }
             }
@@ -162,17 +157,18 @@ async function startHackingScan() {
         case 'tool_call':
           socket?.emit("hacking:output", {
             type: "tool",
-            content: `Executing tool: ${message.tool_name}\nInput: ${JSON.stringify(message.input, null, 2)}`,
+            content: `Executing: ${message.tool_name}`,
           });
           break;
 
         case 'tool_result':
+          // Show abbreviated tool results to avoid flooding the UI
           const resultContent = typeof message.result === 'string'
-            ? message.result
-            : JSON.stringify(message.result, null, 2);
+            ? message.result.slice(0, 500) + (message.result.length > 500 ? '...' : '')
+            : JSON.stringify(message.result, null, 2).slice(0, 500);
           socket?.emit("hacking:output", {
             type: "output",
-            content: `Tool ${message.tool_name} result:\n${resultContent}`,
+            content: `${message.tool_name} completed`,
           });
           break;
 
