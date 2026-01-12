@@ -1,12 +1,12 @@
 const { io } = require("socket.io-client");
 const pty = require("node-pty");
-const { spawn } = require("child_process");
 const si = require("systeminformation");
 const os = require("os");
+const { query } = require("@anthropic-ai/claude-agent-sdk");
 
 let socket = null;
 let terminal = null;
-let hackingProcess = null;
+let hackingAbortController = null;
 
 global.serverConnected = false;
 
@@ -25,7 +25,7 @@ Your tasks:
 7. Scan for open WiFi networks nearby
 8. Check for any suspicious network activity
 
-Tools available: Bash (for running commands like nmap, netstat, arp, iwlist, etc.)
+Tools available: Bash (for running commands like nmap, netstat, arp, iwlist, etc.), Read, Write, Edit, Glob, Grep
 
 After completing the scan, provide a clear summary of:
 - Devices found on the network
@@ -107,129 +107,119 @@ function spawnTerminal() {
   console.log("Terminal started");
 }
 
-function startHackingScan() {
-  if (hackingProcess) {
+async function startHackingScan() {
+  if (hackingAbortController) {
     console.log("Hacking scan already running");
     return;
   }
 
-  console.log("Starting security scan with Claude...");
+  console.log("Starting security scan with Claude Agent SDK...");
 
-  const env = {
-    ...process.env,
-    HOME: "/home/pi",
-    PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + (process.env.PATH || ""),
-  };
+  hackingAbortController = new AbortController();
 
-  // Spawn Claude with the security testing prompt - all tools, no permission prompts
-  hackingProcess = spawn(
-    "/home/pi/.local/bin/claude",
-    [
-      "--dangerously-skip-permissions",
-      "--print",
-      "--output-format", "stream-json",
-      "--system-prompt", HACKING_SYSTEM_PROMPT,
-      "Start the network security scan now. First check network configuration, then scan for devices and open ports."
-    ],
-    {
-      cwd: "/home/pi",
-      env: env,
-    }
-  );
+  try {
+    const response = query({
+      prompt: "Start the network security scan now. First check network configuration, then scan for devices and open ports.",
+      options: {
+        model: "claude-sonnet-4-5",
+        workingDirectory: "/home/pi",
+        systemPrompt: HACKING_SYSTEM_PROMPT,
+        permissionMode: "dangerouslySkipAll", // Skip all permission checks
+      }
+    });
 
-  let buffer = "";
+    for await (const message of response) {
+      // Check if scan was stopped
+      if (hackingAbortController.signal.aborted) {
+        break;
+      }
 
-  hackingProcess.stdout.on("data", (data) => {
-    buffer += data.toString();
-
-    // Try to parse JSON lines
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const json = JSON.parse(line);
-
-        if (json.type === "assistant" && json.message?.content) {
-          // Claude's response text
-          for (const block of json.message.content) {
-            if (block.type === "text") {
-              socket?.emit("hacking:output", {
-                type: "output",
-                content: block.text,
-              });
-            } else if (block.type === "tool_use") {
-              socket?.emit("hacking:output", {
-                type: "tool",
-                content: `Using tool: ${block.name}\nInput: ${JSON.stringify(block.input, null, 2)}`,
-              });
-            }
-          }
-        } else if (json.type === "tool_result" || json.type === "result") {
-          // Tool result
-          if (json.content) {
+      switch (message.type) {
+        case 'assistant':
+          // Handle assistant messages
+          if (typeof message.content === 'string') {
             socket?.emit("hacking:output", {
               type: "output",
-              content: typeof json.content === "string" ? json.content : JSON.stringify(json.content),
+              content: message.content,
             });
+          } else if (Array.isArray(message.content)) {
+            for (const block of message.content) {
+              if (block.type === 'text') {
+                socket?.emit("hacking:output", {
+                  type: "output",
+                  content: block.text,
+                });
+              } else if (block.type === 'tool_use') {
+                socket?.emit("hacking:output", {
+                  type: "tool",
+                  content: `Using tool: ${block.name}\nInput: ${JSON.stringify(block.input, null, 2)}`,
+                });
+              }
+            }
           }
-        }
-      } catch (e) {
-        // Not JSON, just output as text
-        if (line.trim()) {
+          break;
+
+        case 'tool_call':
+          socket?.emit("hacking:output", {
+            type: "tool",
+            content: `Executing tool: ${message.tool_name}\nInput: ${JSON.stringify(message.input, null, 2)}`,
+          });
+          break;
+
+        case 'tool_result':
+          const resultContent = typeof message.result === 'string'
+            ? message.result
+            : JSON.stringify(message.result, null, 2);
           socket?.emit("hacking:output", {
             type: "output",
-            content: line,
+            content: `Tool ${message.tool_name} result:\n${resultContent}`,
           });
-        }
+          break;
+
+        case 'error':
+          socket?.emit("hacking:output", {
+            type: "error",
+            content: `Error: ${message.error?.message || JSON.stringify(message.error)}`,
+          });
+          break;
+
+        case 'system':
+          if (message.subtype === 'init') {
+            socket?.emit("hacking:output", {
+              type: "info",
+              content: `Session started: ${message.session_id}`,
+            });
+          } else if (message.subtype === 'completion') {
+            socket?.emit("hacking:output", {
+              type: "summary",
+              content: "Scan completed successfully",
+            });
+          }
+          break;
+
+        default:
+          console.log('Unknown message type:', message.type);
       }
     }
-  });
 
-  hackingProcess.stderr.on("data", (data) => {
-    const text = data.toString();
-    if (text.trim()) {
-      socket?.emit("hacking:output", {
-        type: "info",
-        content: text,
-      });
-    }
-  });
-
-  hackingProcess.on("close", (code) => {
-    console.log("Hacking scan finished with code:", code);
-    hackingProcess = null;
-
-    socket?.emit("hacking:output", {
-      type: "summary",
-      content: `Scan completed with exit code ${code}`,
-    });
     socket?.emit("hacking:status", "completed");
-  });
-
-  hackingProcess.on("error", (err) => {
-    console.error("Hacking process error:", err);
+  } catch (error) {
+    console.error('Hacking scan error:', error);
     socket?.emit("hacking:output", {
       type: "error",
-      content: `Error: ${err.message}`,
+      content: `Fatal error: ${error.message}`,
     });
     socket?.emit("hacking:status", "completed");
-    hackingProcess = null;
-  });
+  } finally {
+    hackingAbortController = null;
+  }
 }
 
 function stopHackingScan() {
-  if (hackingProcess) {
+  if (hackingAbortController) {
     console.log("Stopping security scan...");
-    hackingProcess.kill("SIGTERM");
-    setTimeout(() => {
-      if (hackingProcess) {
-        hackingProcess.kill("SIGKILL");
-      }
-    }, 3000);
-    hackingProcess = null;
+    hackingAbortController.abort();
+    hackingAbortController = null;
     socket?.emit("hacking:status", "idle");
   }
 }
