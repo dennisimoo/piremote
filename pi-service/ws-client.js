@@ -66,17 +66,14 @@ function connectToServer(serverUrl, piToken) {
     if (!terminal) {
       console.log("Starting terminal...");
 
-      // Set up proper environment
+      // Set up proper environment - inherit from parent but ensure HOME is set
       const env = {
         ...process.env,
         HOME: "/home/pi",
-        USER: "pi",
-        SHELL: "/bin/bash",
-        PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        TERM: "xterm-256color",
+        PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + (process.env.PATH || ""),
       };
 
-      terminal = pty.spawn("bash", [], {
+      terminal = pty.spawn("bash", ["--login", "-i"], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
