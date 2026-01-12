@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# PiRemote Service Installer
+# BlackBox Service Installer
 
 set -e
 
-echo "Installing PiRemote Service..."
+echo "Installing BlackBox Service..."
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -37,17 +37,20 @@ npm install
 # Create systemd service
 cat > /etc/systemd/system/piremote.service << EOF
 [Unit]
-Description=PiRemote Service
+Description=BlackBox Service
 After=network.target bluetooth.target
 
 [Service]
 Type=simple
+User=pi
 WorkingDirectory=/opt/piremote
 ExecStart=/usr/bin/node /opt/piremote/index.js
 Restart=always
 RestartSec=10
-Environment=PIREMOTE_SERVER=https://your-server.com
+Environment=BLACKBOX_SERVER=https://your-server.com
 Environment=PI_TOKEN=your-secret-token
+Environment=HOME=/home/pi
+Environment=PATH=/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 [Install]
 WantedBy=multi-user.target
@@ -61,7 +64,7 @@ echo ""
 echo "Installation complete!"
 echo ""
 echo "IMPORTANT: Edit /etc/systemd/system/piremote.service to set:"
-echo "  - PIREMOTE_SERVER: Your server URL"
+echo "  - BLACKBOX_SERVER: Your server URL"
 echo "  - PI_TOKEN: Your secret token (must match server)"
 echo ""
 echo "Then run:"
