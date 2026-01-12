@@ -124,7 +124,7 @@ async function startHackingScan() {
         model: "claude-sonnet-4-5",
         workingDirectory: "/home/pi",
         systemPrompt: HACKING_SYSTEM_PROMPT,
-        permissionMode: "dangerouslySkipAll", // Skip all permission checks
+        permissionMode: "bypassPermissions", // Skip all permission checks
       }
     });
 
