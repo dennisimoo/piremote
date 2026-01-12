@@ -121,13 +121,13 @@ function startHackingScan() {
     PATH: "/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + (process.env.PATH || ""),
   };
 
-  // Spawn Claude with the security testing prompt
+  // Spawn Claude with the security testing prompt - all tools, no permission prompts
   hackingProcess = spawn(
     "/home/pi/.local/bin/claude",
     [
+      "--dangerously-skip-permissions",
       "--print",
       "--output-format", "stream-json",
-      "--allowedTools", "Bash,Read,Glob,Grep",
       "--system-prompt", HACKING_SYSTEM_PROMPT,
       "Start the network security scan now. First check network configuration, then scan for devices and open ports."
     ],
