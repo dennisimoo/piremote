@@ -14,20 +14,8 @@ export default function SetupPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("token="))
-      ?.split("=")[1];
-
-    if (!token) {
-      router.push("/");
-      return;
-    }
-
     // Connect to socket to check if Pi is online
-    const socket = io({
-      auth: { token },
-    });
+    const socket = io();
 
     socket.on("connect", () => {
       // Wait a moment to receive pi:online or pi:offline

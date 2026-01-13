@@ -2,7 +2,6 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { validateToken } from "./lib/auth";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
@@ -90,14 +89,6 @@ app.prepare().then(() => {
 
   // Default namespace - for web browser connections
   io.on("connection", (socket) => {
-    const token = socket.handshake.auth.token;
-
-    if (!validateToken(token)) {
-      console.log("Client rejected - invalid token");
-      socket.disconnect();
-      return;
-    }
-
     console.log("Client connected");
     clientSockets.add(socket);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 const SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
@@ -15,7 +15,8 @@ interface BluetoothConnectProps {
 }
 
 export function BluetoothConnect({ onConnected, onError }: BluetoothConnectProps) {
-  const [connecting, setConnecting] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [autoRetry, setAutoRetry] = useState(false);
 
   const connect = async () => {
     if (!navigator.bluetooth) {
@@ -23,7 +24,7 @@ export function BluetoothConnect({ onConnected, onError }: BluetoothConnectProps
       return;
     }
 
-    setConnecting(true);
+    setSearching(true);
 
     try {
       const device = await navigator.bluetooth.requestDevice({
@@ -44,18 +45,55 @@ export function BluetoothConnect({ onConnected, onError }: BluetoothConnectProps
       };
 
       onConnected(device, characteristics);
+      setAutoRetry(false);
     } catch (err: any) {
-      if (err.name !== "NotFoundError") {
+      if (err.name === "NotFoundError") {
+        // Device not found, enable auto-retry
+        setAutoRetry(true);
+      } else {
         onError(err.message || "Failed to connect");
+        setAutoRetry(false);
       }
     } finally {
-      setConnecting(false);
+      setSearching(false);
     }
   };
 
+  // Auto-retry connection every 3 seconds if enabled
+  useEffect(() => {
+    if (!autoRetry) return;
+
+    const interval = setInterval(() => {
+      connect();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [autoRetry]);
+
   return (
-    <Button onClick={connect} disabled={connecting} size="lg">
-      {connecting ? "Connecting..." : "Connect via Bluetooth"}
-    </Button>
+    <div className="space-y-4">
+      <Button onClick={connect} disabled={searching} size="lg" className="w-full">
+        {searching ? "Searching for device..." : "Search for Raspberry Pi"}
+      </Button>
+
+      {autoRetry && (
+        <div className="flex items-center gap-3 text-sm text-gray-400">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: "0ms" }} />
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: "150ms" }} />
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: "300ms" }} />
+          </div>
+          <span>Searching for Raspberry Pi...</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setAutoRetry(false)}
+            className="ml-auto text-xs"
+          >
+            Stop
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
