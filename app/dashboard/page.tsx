@@ -105,18 +105,18 @@ export default function DashboardPage() {
           <div className="h-full flex items-center justify-center">
             <p className="text-gray-500">Connecting to Pi...</p>
           </div>
-        ) : view === "hacking" ? (
-          <div className="h-full p-4">
-            <HackingPanel socket={socket} />
-          </div>
-        ) : view === "terminal" ? (
-          <div className="h-full p-4" style={{ minHeight: "400px" }}>
-            <Terminal socket={socket} />
-          </div>
         ) : (
-          <div className="p-4">
-            <Stats stats={stats} />
-          </div>
+          <>
+            <div className={`h-full p-4 ${view === "hacking" ? "" : "hidden"}`}>
+              <HackingPanel socket={socket} />
+            </div>
+            <div className={`h-full p-4 ${view === "terminal" ? "" : "hidden"}`} style={{ minHeight: "400px" }}>
+              <Terminal socket={socket} />
+            </div>
+            <div className={`p-4 ${view === "stats" ? "" : "hidden"}`}>
+              <Stats stats={stats} />
+            </div>
+          </>
         )}
       </main>
     </div>
