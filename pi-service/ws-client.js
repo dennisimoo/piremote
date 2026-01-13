@@ -107,7 +107,7 @@ function spawnTerminal() {
   console.log("Terminal started");
 }
 
-async function startHackingScan() {
+async function startHackingScan(customSystemPrompt) {
   if (hackingAbortController) {
     console.log("Hacking scan already running");
     return;
@@ -117,13 +117,16 @@ async function startHackingScan() {
 
   hackingAbortController = new AbortController();
 
+  // Use custom prompt if provided, otherwise use default
+  const systemPrompt = customSystemPrompt || HACKING_SYSTEM_PROMPT;
+
   try {
     const response = query({
       prompt: "Start the network security scan now. First check network configuration, then scan for devices and open ports.",
       options: {
         model: "claude-sonnet-4-5",
         workingDirectory: "/home/pi",
-        systemPrompt: HACKING_SYSTEM_PROMPT,
+        systemPrompt: systemPrompt,
         permissionMode: "bypassPermissions", // Skip all permission checks
       }
     });
@@ -262,9 +265,13 @@ function connectToServer(serverUrl, piToken) {
   });
 
   // Hacking events
-  socket.on("hacking:start", () => {
+  socket.on("hacking:start", (data) => {
     console.log("Received hacking:start");
-    startHackingScan();
+    const customPrompt = data?.systemPrompt;
+    if (customPrompt) {
+      console.log("Using custom system prompt");
+    }
+    startHackingScan(customPrompt);
   });
 
   socket.on("hacking:stop", () => {

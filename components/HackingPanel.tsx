@@ -7,6 +7,7 @@ import type { Socket } from "socket.io-client";
 
 interface HackingPanelProps {
   socket: Socket | null;
+  systemPrompt?: string;
 }
 
 interface LogEntry {
@@ -15,7 +16,7 @@ interface LogEntry {
   timestamp: Date;
 }
 
-export function HackingPanel({ socket }: HackingPanelProps) {
+export function HackingPanel({ socket, systemPrompt }: HackingPanelProps) {
   const [status, setStatus] = useState<"idle" | "running" | "completed">("idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -72,7 +73,7 @@ export function HackingPanel({ socket }: HackingPanelProps) {
       },
     ]);
     setStatus("running");
-    socket.emit("hacking:start");
+    socket.emit("hacking:start", { systemPrompt });
   };
 
   const handleStop = () => {

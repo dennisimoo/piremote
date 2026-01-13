@@ -6,6 +6,7 @@ import { io, Socket } from "socket.io-client";
 import { Terminal } from "@/components/Terminal";
 import { Stats } from "@/components/Stats";
 import { HackingPanel } from "@/components/HackingPanel";
+import { Settings } from "@/components/Settings";
 import { Button } from "@/components/ui/button";
 
 interface StatsData {
@@ -21,7 +22,8 @@ export default function DashboardPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [stats, setStats] = useState<StatsData | null>(null);
-  const [view, setView] = useState<"hacking" | "terminal" | "stats">("hacking");
+  const [view, setView] = useState<"hacking" | "terminal" | "stats" | "settings">("hacking");
+  const [systemPrompt, setSystemPrompt] = useState<string>("");
   const router = useRouter();
 
   useEffect(() => {
@@ -94,6 +96,13 @@ export default function DashboardPage() {
           >
             Stats
           </Button>
+          <Button
+            variant={view === "settings" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("settings")}
+          >
+            Settings
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             Logout
           </Button>
@@ -108,13 +117,16 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className={`h-full p-4 ${view === "hacking" ? "" : "hidden"}`}>
-              <HackingPanel socket={socket} />
+              <HackingPanel socket={socket} systemPrompt={systemPrompt} />
             </div>
             <div className={`h-full p-4 ${view === "terminal" ? "" : "hidden"}`} style={{ minHeight: "400px" }}>
               <Terminal socket={socket} />
             </div>
             <div className={`p-4 ${view === "stats" ? "" : "hidden"}`}>
               <Stats stats={stats} />
+            </div>
+            <div className={`h-full p-4 overflow-y-auto ${view === "settings" ? "" : "hidden"}`}>
+              <Settings onSystemPromptChange={setSystemPrompt} />
             </div>
           </>
         )}

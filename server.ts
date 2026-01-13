@@ -123,10 +123,10 @@ app.prepare().then(() => {
     });
 
     // Start hacking scan
-    socket.on("hacking:start", () => {
+    socket.on("hacking:start", (data: { systemPrompt?: string }) => {
       console.log("Client requested hacking scan");
       if (piSocket) {
-        piSocket.emit("hacking:start");
+        piSocket.emit("hacking:start", data);
       }
     });
 
